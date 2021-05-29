@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Hello World!</title>
+    <link rel="stylesheet" href="index.css">
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+  </head>
+  <body>
+    <h1>💖 Hello World!</h1>
+    <p>Nakuha rajud teka :'(</p>
+  </body>
+  <script>
+
+  function doLogin() {
+    axios.post('http://localhost:8080/api/user/login', {
+      email: 'splace@gmail.com',
+      password: '12345678'
+    })
+    .then(function (response) {
+      console.log(response);
+    })
+    .catch(function (error) {
+      console.log(error);
+    })
+  }
+    function getBreaks() {
+      axios.get('http://localhost:8080/api/breaks')
+        .then(function (response) {
+          // handle success
+          console.log(response);
+        })
+        .catch(function (error) {
+          // handle error
+          console.log(error);
+        })
+        .then(function () {
+          // always executed
+        });
+    }
+
+    
+    doLogin();
+    getBreaks();
+  </script>
+</html>
