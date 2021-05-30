@@ -39,6 +39,15 @@
     ::-webkit-scrollbar {
     display: none;
     }
+    .is-red{
+        background: red;
+    }
+    .is-blue{
+        background: green;
+    }
+    .is-white{
+        background: white;
+    }
   </style>
 </head>
 
@@ -295,9 +304,37 @@
               </div>
             </div>
             <div class="col-lg-6 col-7 mb-2">
-              <h6 class="h2 text-white d-inline-block mb-0">Breaks</h6>
+              <h6 class="h2 text-white d-inline-block mb-0">Breaks</h6>              
             </div>
 
+            <employee-break-timer 
+                :status="is_break" 
+                :time_limit="break_time_limit"
+                v-if="is_break"
+                v-on:changeRemainingTime="updateRemainingTime($event)"
+                :break_id="current_break_id"
+            >                
+            </employee-break-timer>
+
+            <div class="row">
+                <div class="col-md-12"
+                  v-for="breakList in break_list" :key="breakList.id"
+                  style="display:block"
+                  @click="changeBreakStatus(breakList)"      
+                  v-if="breakList.status != null"   
+                  :disabled="is_check_in == false || breakList.is_disabled == true"   
+                  :key='breakList.id'     
+                  
+                >
+                  <button 
+                      style="margin-bottom: 20px; margin-left: 40px;"
+                      :class="{' btn btn-md btn-neutral is-blue': breakList.status, 'btn btn-md btn-neutral is-red': !breakList.status }"
+                    >
+                    {{ breakList.name }}
+                    {{ breakList.break_time }} mins
+                  </button>
+                </div>
+            </div>
          
               <!-- <div class="col-xl-3 col-md-6" v-for="break in breakList" :key="break.id">
                 <div class="card card-stats">
@@ -347,6 +384,10 @@
   <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
   <script>
 
+    // import Vue from 'vue'
+    // import EmployeeBreakTimer from './EmployeeBreakTimer'
+
+    Vue.component('employee-break-timer', './EmployeeBreakTimer')
 
     new Vue({
       el: '#app',
@@ -356,38 +397,386 @@
         totalSecondsBreak: 0,
         logStatus: 'Check-in',
         breakList: [],
+
+        employee_attendance: null,
+        time_in_date: null,
+        checkStatus: 'Check-in',
+        checkColor: 'green',
+        breakColor: 'primary',
+        datenow: '',
+        runningTime: 0,
+        isRunning: false,
+        interval: null,
+        break_list: [],
+        timer_status: false,
+        current_break: -1,
+        break_duration: 0,
+        is_check_in: false,
+        is_check_out: false,
+        is_break: false,
+        disable_checkStatus: false,
+        break_time_limit: 0,
+        current_break_id: 0,
+        local_stored_break: {}
+      },
+
+      watch: {
+        timer_status(value) {
+          var vm = this;
+
+          if(vm.is_check_in == false){
+            vm.checkStatus = 'Check-in';
+            vm.checkColor = 'green'
+            vm.disable_checkStatus = false;
+          }
+          else if(vm.is_check_in == true){
+            vm.checkStatus = 'Check-out';
+            vm.checkColor = 'red'
+            vm.disable_checkStatus = false;
+          }
+
+          if(vm.is_break == true) {
+            vm.checkStatus = 'Check-out'
+            vm.checkColor = 'red'
+            vm.disable_checkStatus = true;
+          }
+        },
+        is_check_out(value){
+          var vm = this;
+          if(value == true){
+            vm.checkStatus = 'Checked-out';
+            vm.checkColor = 'red'
+            vm.disable_checkStatus = true;
+            vm.timer_status = false;
+          }
+        },
+        is_break(value){
+          var vm = this;
+
+          if(value == true){
+              vm.break_list.map((item, index) => {
+                if(item.id === vm.current_break_id){                     
+                    if(item.time_consume != null && item.time_consume != 0){
+                        vm.$set(item,'remaining_seconds',item.time_consume);
+                        vm.break_time_limit = item.time_consume;
+                    }
+                    else{
+                        vm.local_stored_break = this.retrieveLocalStorageBreakRemainingSec(vm.current_break_id);
+                        if(!isNaN(vm.local_stored_break.remaining_seconds)){
+                          vm.$set(item,'remaining_seconds',vm.local_stored_break.remaining_seconds);
+                          vm.break_time_limit = vm.local_stored_break.remaining_seconds;
+                        }                
+                        
+                    }
+                    vm.$set(item,'status',1);                
+                }
+                else{
+                  vm.$set(item,'is_disabled',true);
+                  vm.$set(item,'status',0);              
+                }
+                this.checkBreakStatus(item.status);
+            });
+          }        
+
+        }
       },
 
       created() {
-        this.getBreak()
+        // this.getBreak()        
+        this.getBreaks()
       },
 
       methods: {
+
+        async getBreaks() {
+            var vm = this;
+            try {
+              const response = await axios.get('http://localhost:8081/breaks');
+              vm.break_list = response.data;
+              // vm.checkAttendance(vm.$route.params.employee_id);
+              // temporary
+              vm.checkAttendance(1);
+            }catch (error) {
+              console.log('method: getBreaks');
+              console.error(error);
+            }
+            
+        },
+        checkAttendance(id) {
+            var vm = this;
+            var today = new Date();
+            var date = today.getFullYear()+'-'+(today.getMonth()+1)+'-'+today.getDate();
+            var local_storage_is_break = '';
+
+            try{
+
+              axios.get('http://localhost:8081/employee/specific-attendance', {
+                  employee_id : id, 
+                  at_date: date 
+              })
+              .then((response) => {                
+                  vm.employee_attendance = response.employee_attendance;
+                  if(response.employee_attendance) {
+                    if(response.employee_attendance.time_out == null){
+                      var date = response.employee_attendance.at_date + " " + response.employee_attendance.time_in;
+                      vm.time_in_date = new Date(date);
+                      vm.timer_status = true;
+                      vm.is_check_in = true;
+                    }     
+                    else{
+                      vm.timer_status = false;
+                      vm.is_check_out = true;
+                    }         
+                  }        
+                  
+                  
+
+                  vm.break_list.map((item, index) => {
+                      var status = 0;
+                      var start_time = null;
+                      var tmp_remaining_sec = '';
+                      if(vm.employee_attendance) {                                 
+
+                        vm.employee_attendance.break_details.map((detail,index2) => {
+                          if(item.id === detail.break_id) {                      
+                            if(detail.end_time != null && detail.start_time != null){  
+                              status = 0;
+                              start_time = detail.start_time;
+                              vm.is_break = false;
+                              vm.current_break_id = 0;      
+                              tmp_remaining_sec = parseInt(detail.time_consume);                        
+                              
+                              var tmp_is_break = '';
+                              if ("is_break" in localStorage) {                          
+                                tmp_is_break = localStorage.getItem("is_break");
+                                if(tmp_is_break === 'true'){
+                                  vm.current_break = detail.break_id;
+                                  status = 1;
+                                  start_time = detail.start_time;
+                                  vm.is_break = true;
+                                  vm.current_break_id = item.id;
+                                }
+                                  
+                              }                        
+                            }
+                            if(detail.end_time == null && detail.start_time != null){
+                              // if user has break
+                              vm.current_break = detail.break_id;
+                              status = 1;
+                              start_time = detail.start_time;
+                              vm.is_break = true;
+                              vm.current_break_id = item.id;    
+                              tmp_remaining_sec = 0;           
+                            }
+                          }                    
+                          
+                        });
+                      }                      
+                      
+                      
+                      vm.$set(item,'status',status);
+                      vm.$set(item,'start_time',start_time);                
+                      vm.$set(item,'is_disabled',false);
+
+                      var tmp = 0;
+                      if(tmp_remaining_sec != '' && tmp_remaining_sec > 0){
+                        tmp = vm.formattedTimeLeft(parseInt(tmp_remaining_sec));
+                        vm.$set(item,'break_time',tmp);
+                        vm.$set(item,'remaining_seconds',parseInt(tmp_remaining_sec));                 
+                      }
+                      else{                 
+                        if(parseInt(tmp_remaining_sec) <= 0){
+                            vm.$set(item,'is_disabled',true);
+                            tmp = vm.formattedTimeLeft(parseInt(tmp_remaining_sec));
+                            vm.$set(item,'break_time',tmp);
+                            vm.$set(item,'remaining_seconds',parseInt(tmp_remaining_sec));                      
+                        }
+                        else{
+                            vm.$set(item,'remaining_seconds',(item.break_time * 60));
+                        }
+
+                        
+                      }
+                      
+                  });
+
+              }, (error) => {
+                console.log(error);
+              });
+
+            }catch (error) {
+              console.log('method: checkAttendance');
+              console.error(error);
+            }           
+            
+        },
+
+        checkBreakStatus(value) {
+          if (value == 1) {
+            return 'red';
+          }
+          if (value == 0) {
+            return 'green';
+          }
+          if (value == 2) {
+            return 'primary';
+          }
+        },
+        changeBreakStatus(data) {
+          if(data.status == 0) {
+            this.breakIn(data);
+          }
+          else if(data.status == 1) {
+            this.breakOut(data);
+          }
+        },
+        breakIn(data) {
+          var vm = this;
+          var today = new Date();
+          var date = today.getFullYear()+'-'+(today.getMonth()+1)+'-'+today.getDate();
+          var time = today.getHours()+':'+today.getMinutes()+':'+today.getSeconds();
+          var start_time = date + " " + time;  
+
+          vm.is_break = true;
+          vm.timer_status = false;
+          vm.break_time_limit = data.remaining_seconds;
+          vm.current_break_id = data.id;
+          vm.disable_checkStatus = true;
+
+          vm.break_list.map((item, index) => {
+              if(item.id === data.id){
+                vm.$set(item,'status',1);
+              }
+              else{
+                vm.$set(item,'is_disabled',true);
+              }
+          });
+
+          console.log(vm.is_break);
+
+          // axios.post('http://localhost:8081/employee/break-in', {
+          //     attendance_id : 1,
+          //     start_time: start_time,
+          //     break_id: data.id
+          // })
+          // .then((response) => {
+          //   vm.is_break = true;
+          //   vm.timer_status = false;
+          //   vm.break_time_limit = data.remaining_seconds;
+          //   vm.current_break_id = data.id;
+          //   vm.disable_checkStatus = true;
+
+          //   vm.break_list.map((item, index) => {
+          //       if(item.id === data.id){
+          //         vm.$set(item,'status',1);
+          //       }
+          //       else{
+          //         vm.$set(item,'is_disabled',true);
+          //       }
+          //   });
+          // }, (error) => {
+          //   console.log(error);
+          // });
+        },
+        removeLocalStorageBreakRemainingSec(){
+            localStorage.removeItem('is_break');
+            localStorage.removeItem('break_id');
+            localStorage.removeItem('remaining_seconds');
+        },
+
+        localStorageBreakRemainingSec(break_id, sec){
+          var vm = this;
+          if (typeof(Storage) !== "undefined") {
+              localStorage.setItem("is_break", vm.is_break);
+              localStorage.setItem("break_id", break_id);
+              localStorage.setItem("remaining_seconds", sec);
+              return true;
+          } 
+          else{
+            console.log('Browser doesn\'t support web storage');
+            return false;
+          }
+        },
+
+        retrieveLocalStorageBreakRemainingSec(break_id){
+            if ("break_id" in localStorage) {
+              if(break_id == localStorage.getItem("break_id")){
+                return {'break_id': localStorage.getItem("break_id"), 'remaining_seconds': localStorage.getItem("remaining_seconds"), 'is_break': localStorage.getItem("is_break")};
+              }            
+              
+            }
+            return false;
+        },
+
+        formattedTimeLeft(timeLeft) {
+            const minutes = Math.floor(timeLeft / 60);
+            let seconds = timeLeft % 60;
+
+            if (seconds < 10) {
+                seconds = `0${seconds}`;
+            }
+
+            return `${minutes}:${seconds}`;
+        },
+
+        updateRemainingTime(data){
+            var vm = this;
+            vm.break_list.map((item, index) => {
+                if(item.id === data.id){
+                  vm.$set(item,'remaining_seconds',data.remainingTime);
+                  vm.$set(item,'break_time',vm.formattedTimeLeft(data.remainingTime));
+                  vm.localStorageBreakRemainingSec(data.id, data.remainingTime);
+                }
+            });
+
+        },
+
+
+
         async getBreak() {
           try {
-            const response = await axios.get('http://localhost:8080/breaks');
+            const response = await axios.get('http://localhost:8081/breaks');
             this.breakList = response.data
+            this.break_list = response.data
 
-            this.breakList.forEach(element => {
+            this.breakList.forEach(element => {              
+
+            const element_stringify = JSON.stringify(JSON.stringify(element));
+
+            const div =  + '<div >'
+                + '<div class="card card-stats">'
+                  + '<div class="card-body">'
+                    + '<div class="row">'
+                      + '<div class="col">'
+                        + '<h5 class="card-title text-uppercase text-muted mb-0">'+element.name+'</h5>'
+                        + '<span class="h1 font-weight-bold mb-0">'+element.break_time+'</span>'
+                      + '</div>'
+                      + '<div class="col-auto">'
+                        + '<input class="mt-4 breakBtn" type="radio" name="option" value="option1" data-breakinfo="'+ element_stringify +'">'
+                      + '</div>'
+                    + '</div>'
+                  + '</div>'
+                + '</div>'
+              + '</div>'
+
               
-            const div =  `<div >
-                <div class="card card-stats">
-                  <div class="card-body">
-                    <div class="row">
-                      <div class="col">
-                        <h5 class="card-title text-uppercase text-muted mb-0">${element.name}</h5>
-                        <span class="h1 font-weight-bold mb-0">${element.break_time}</span>
-                      </div>
-                      <div class="col-auto">
-                        <input class="mt-4" type="radio" name="option" value="option1" onclick="radioBreak()">
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>`
+            // const div =  `<div >
+            //     <div class="card card-stats">
+            //       <div class="card-body">
+            //         <div class="row">
+            //           <div class="col">
+            //             <h5 class="card-title text-uppercase text-muted mb-0">${element.name}</h5>
+            //             <span class="h1 font-weight-bold mb-0">${element.break_time}</span>
+            //           </div>
+            //           <div class="col-auto">
+            //             <input class="mt-4" type="radio" name="option" value="option1">
+            //           </div>
+            //         </div>
+            //       </div>
+            //     </div>
+            //   </div>`
 
-              $('#breakContent').append(div)
-
+              // $('#breakContent').append(div)
 
             });
           } catch (error) {
@@ -440,7 +829,6 @@
           window.$('#btnLogCheckIn').show();
           clearInterval(this.timerVar)
         },
-
       },
       mounted(){
         // this.getBreak()
@@ -451,8 +839,22 @@
           this.timerVar = setInterval(this.countTimer, 1000);
           window.$('#btnLogCheckOut').show();
           window.$('#btnLogCheckIn').hide();
-        }
-      }
+        }      
+        
+        $('.breakBtn').click(function(){
+            alert('yeah');
+        }); 
+
+      },
+      // updated() {
+      //     var vm = this;
+          
+      //     $('.breakBtn').click(function(e){
+      //         e.stopImmediatePropagation();
+      //         console.log('ayyay');
+      //         console.log($('.breakBtn').data('breakinfo'))
+      //     });
+      // }
     })
     
      
