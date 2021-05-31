@@ -313,7 +313,7 @@
                         class="btn btn-secondary"
                       >
                         {{ checkStatus }}<br>
-                        {{ dateText(time_in_date) }}
+                        <!-- {{ dateText(time_in_date) }} -->
                       </button>
                     </div>
                   </div>
@@ -334,6 +334,54 @@
             </employee-break-timer>
 
             <div class="row">
+                <div  class="col-md-12" v-for="breakList in break_list" :key="breakList.id">   
+                    <div class="col-xl-3 col-md-6"  >
+                      <div class="card card-stats">
+                          <div class="card-body">
+                            <div class="row">
+                                <div class="col">
+                                    <h5 class="card-title text-uppercase text-muted mb-0">{{ breakList.name }}</h5>
+                                    <span class="h1 font-weight-bold mb-0" :id="breakList.id">{{ breakList.break_time }}</span>
+                                </div>
+                                <div class="col-auto">
+                                    <button 
+                                        class="btn btn-icon btn-secondary icon icon-shape bg-gradient-orange text-white rounded-circle shadow" 
+                                        type="button"
+                                        @click="changeBreakStatus(breakList)"   
+                                        v-if="breakList.status != null"
+                                        :key='breakList.id'
+                                        :disabled="is_check_in == false || breakList.is_disabled == true"
+                                    >
+                                        <span class="btn-inner--icon">
+                                            <i 
+                                                :class="checkBreakStatusIcon(breakList.status)"
+                                            >
+                                            </i>
+                                        </span>
+                                    </button>
+                                    <!-- <div 
+                                        class="icon icon-shape bg-gradient-orange text-white rounded-circle shadow"
+                                        @click="changeBreakStatus(breakList)"   
+                                        v-if="breakList.status != null"
+                                        :key='breakList.id'
+                                        :disabled="is_check_in == false || breakList.is_disabled == true"
+                                    >
+                                        <i 
+                                            :class="checkBreakStatusIcon(breakList.status)"
+                                        ></i>
+                                    </div> -->
+                                    <!-- <div @click="radioBreakPause(breakList)" class="icon icon-shape bg-gradient-orange text-white rounded-circle shadow">
+                                        <i class="ni ni-button-pause"></i>
+                                    </div> -->
+                                </div>
+                            </div>
+                          </div>
+                      </div>
+                    </div>
+                </div>            
+            </div>
+
+            <!-- <div class="row">
                 <div class="col-md-12"
                   v-for="breakList in break_list" :key="breakList.id"
                   style="display:block"
@@ -350,7 +398,7 @@
                     {{ breakList.break_time }} mins
                   </button>
                 </div>
-            </div>            
+            </div>             -->
          
               <!-- <div class="col-xl-3 col-md-6" v-for="break in breakList" :key="break.id">
                 <div class="card card-stats">
@@ -807,6 +855,19 @@
               console.error(error);
             }           
             
+        },
+
+        checkBreakStatusIcon(value){
+            // ni ni-button-play
+            if (value == 1) {
+              return 'ni ni-button-pause';
+            }
+            if (value == 0) {
+              return 'ni ni-button-play';
+            }
+            if (value == 2) {
+              return 'ni ni-button-play';
+            }
         },
 
         checkBreakStatus(value) {
