@@ -15,19 +15,19 @@ const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: 450,
     height: 680,
-    // width: 600,
-    // height: 800,
+    // width: 1000,
+    // height: 1080,
     maximizable: false,
     resizable: false,
   });
 
   // and load the index.html of the app.
   mainWindow.loadFile(path.join(__dirname, 'login.html'));
-  // mainWindow.setMenuBarVisibility(false);
+  mainWindow.setMenuBarVisibility(false);
   
 
   // Open the DevTools.
-  mainWindow.webContents.openDevTools();
+  // mainWindow.webContents.openDevTools();
 };
 
 // This method will be called when Electron has finished

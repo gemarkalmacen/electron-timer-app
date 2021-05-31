@@ -1,18 +1,3 @@
-<!--
-=========================================================
-* Argon Dashboard - v1.2.0
-=========================================================
-* Product Page: https://www.creative-tim.com/product/argon-dashboard
-
-
-* Copyright  Creative Tim (http://www.creative-tim.com)
-* Coded by www.creative-tim.com
-
-
-
-=========================================================
-* The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
--->
 <!DOCTYPE html>
 <html>
 
@@ -298,30 +283,38 @@
               <h6 class="h2 text-white d-inline-block mb-0">Breaks</h6>
             </div>
 
-         
-              <!-- <div class="col-xl-3 col-md-6" v-for="break in breakList" :key="break.id">
+
+            <div class="row">
+
+            <div  class="col-md-12" v-for="breakList in break_list" :key="breakList.id">   
+              <div class="col-xl-3 col-md-6"  >
                 <div class="card card-stats">
                   <div class="card-body">
                     <div class="row">
                       <div class="col">
-                        <h5 class="card-title text-uppercase text-muted mb-0">{{ break.name }}</h5>
-                        <span class="h1 font-weight-bold mb-0">{{ break.break_time }}</span>
+                        <h5 class="card-title text-uppercase text-muted mb-0">{{ breakList.name }}</h5>
+                        <span class="h1 font-weight-bold mb-0" :id="breakList.id">{{ breakList.break_time }}</span>
                       </div>
                       <div class="col-auto">
-                        <div class="icon icon-shape bg-gradient-orange text-white rounded-circle shadow">
-                          <i class="ni ni-chart-pie-35"></i>
+                        <div @click="radioBreakPlay(breakList)" class="icon icon-shape bg-gradient-orange text-white rounded-circle shadow">
+                          <i class="ni ni-button-play"></i>
+                        </div>
+                        <div @click="radioBreakPause(breakList)" class="icon icon-shape bg-gradient-orange text-white rounded-circle shadow">
+                          <i class="ni ni-button-pause"></i>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div> -->
-          
+              </div>
+            </div>
+
+          </div>
            
 
-            <div id="breakContent" class="col-xl-3 col-md-6">
+            <!-- <div id="breakContent" class="col-xl-3 col-md-6">
 
-            </div>
+            </div> -->
           
       
             
@@ -352,10 +345,14 @@
       el: '#app',
       data: {
         timerVar: null,
+        breakTimerVar: null,
         totalSeconds: 0,
         totalSecondsBreak: 0,
         logStatus: 'Check-in',
-        breakList: [],
+        timeAllocation: 0,
+        break_list: [],
+        selectedBreak: null,
+        updatedBreakList: []
       },
 
       created() {
@@ -366,27 +363,15 @@
         async getBreak() {
           try {
             const response = await axios.get('http://localhost:8080/breaks');
-            this.breakList = response.data
+            this.break_list = response.data
 
-            this.breakList.forEach(element => {
+            this.break_list.forEach(breaks => {
               
-            const div =  `<div >
-                <div class="card card-stats">
-                  <div class="card-body">
-                    <div class="row">
-                      <div class="col">
-                        <h5 class="card-title text-uppercase text-muted mb-0">${element.name}</h5>
-                        <span class="h1 font-weight-bold mb-0">${element.break_time}</span>
-                      </div>
-                      <div class="col-auto">
-                        <input class="mt-4" type="radio" name="option" value="option1" onclick="radioBreak()">
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>`
+                // if(breaks) {
 
-              $('#breakContent').append(div)
+                // }
+
+                localStorage.setItem("runningTimeBreak"+breaks.id, 0);
 
 
             });
@@ -409,6 +394,7 @@
              document.getElementById("timer").innerHTML = hour + ":" + minute + ":" + seconds;
         },
         countTimerBreaks() {
+             this.totalSecondsBreak = parseInt(localStorage.getItem(`runningTimeBreak${this.selectedBreak.id}`) ?? 0);
            --this.totalSecondsBreak;
            var hour = Math.floor(this.totalSecondsBreak /3600);
            var minute = Math.floor((this.totalSecondsBreak - hour*3600)/60);
@@ -419,13 +405,28 @@
              minute = "0"+minute;
            if(seconds < 10)
              seconds = "0"+seconds;
-             localStorage.setItem("runningTimeBreak", this.totalSecondsBreak);
-             document.getElementById("timer").innerHTML = hour + ":" + minute + ":" + seconds;
+             
+
+             localStorage.setItem("runningTimeBreak"+this.selectedBreak.id, this.totalSecondsBreak);
+             document.getElementById(this.selectedBreak.id).innerHTML = (minute - this.selectedBreak.break_time) + ":" + seconds;
         },
-        radioBreak() {
+        radioBreakPlay(data) {
           clearInterval(this.timerVar)
+          // clearInterval(this.breakTimerVar)
+          this.timeAllocation = data.break_time
+          this.selectedBreak = data
+          this.breakTimerVar = setInterval(this.countTimerBreaks, 1000)
+        },
+        radioBreakPause(data) {
+          // clearInterval(this.timerVar)
+          this.timerVar = setInterval(this.countTimer, 1000);
+          clearInterval(this.breakTimerVar)
+          // this.timeAllocation = data.break_time
+          // this.selectedBreak = data
+          // this.breakTimerVar = setInterval(this.countTimerBreaks, 1000)
         },
         btnLogCheckIn() {
+          clearInterval(this.breakTimerVar)
           this.timerVar = setInterval(this.countTimer, 1000);
           this.totalSeconds = parseInt(localStorage.getItem('runningTime') ?? 0);
           this.logStatus = 'Check-out'
@@ -434,11 +435,17 @@
           window.$('#btnLogCheckIn').hide();
         },
         btnLogCheckOut() {
+          clearInterval(this.breakTimerVar)
+          clearInterval(this.timerVar)
           this.logStatus = 'Check-in'
           localStorage.setItem("logStatus", 'Check-in');
           window.$('#btnLogCheckOut').hide();
           window.$('#btnLogCheckIn').show();
-          clearInterval(this.timerVar)
+          // clearInterval(this.timerVar)
+          localStorage.removeItem("runningTime");
+        },
+        saveToStorage(key, value) {
+            localStorage.setItem(key, JSON.stringify(value))
         },
 
       },
@@ -452,6 +459,10 @@
           window.$('#btnLogCheckOut').show();
           window.$('#btnLogCheckIn').hide();
         }
+
+        $(".breakName").click(function(){
+         alert("dwwdwsss");
+        });
       }
     })
     
