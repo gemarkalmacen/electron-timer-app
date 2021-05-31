@@ -15,7 +15,6 @@
 </template>
 
 <script>   
-alert('component');
 //   const TIME_LIMIT = 20;
 
   export default {

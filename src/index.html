@@ -21,6 +21,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
   <meta name="description" content="Start your development with a Dashboard for Bootstrap 4.">
   <meta name="author" content="Creative Tim">
+  <meta name="csrf-token" content="">
   <title>Splace | Time Tacker</title>
   <!-- Favicon -->
   <link rel="icon" href="assets/img/brand/favicon.png" type="image/png">
@@ -282,6 +283,7 @@
     </nav>
     <!-- Header -->
     <!-- Header -->
+    <input type="hidden" name="_token" id="_token" value=""/>
     <div class="header bg-primary pb-6">
       <div class="container-fluid">
         <div class="header-body">
@@ -293,11 +295,26 @@
                 <div class="card-body">
                   <div class="row">
                     <div class="col">
-                      <span class="h1 font-weight-bold mb-0" id="timer">0</span>
+                      <!-- <span class="h1 font-weight-bold mb-0" id="timer">0</span> -->
+                      <employee-timer-elapsed-time 
+                          :from="time_in_date" 
+                          :status="timer_status" 
+                          :break_duration="break_duration" 
+                          v-if="time_in_date"
+                      >
+                      </employee-timer-elapsed-time>
                     </div>
                     <div class="col-auto">
-                      <a href="#" class="btn btn-sm btn-neutral" v-if="logStatus === 'Check-in'" @click="btnLogCheckIn">Check-in</a>
-                      <a href="#" class="btn btn-sm btn-neutral" v-else @click="btnLogCheckOut">Check-out</a>
+                      <!-- <a href="#" class="btn btn-sm btn-neutral" v-if="logStatus === 'Check-in'" @click="btnLogCheckIn">Check-in</a>
+                      <a href="#" class="btn btn-sm btn-neutral" v-else @click="btnLogCheckOut">Check-out</a> -->
+                      <button
+                        @click="changeTimeInStatus(timer_status)"
+                        :disabled="disable_checkStatus == true"
+                        class="btn btn-secondary"
+                      >
+                        {{ checkStatus }}<br>
+                        {{ dateText(time_in_date) }}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -311,7 +328,7 @@
                 :status="is_break" 
                 :time_limit="break_time_limit"
                 v-if="is_break"
-                v-on:changeRemainingTime="updateRemainingTime($event)"
+                v-on:change="updateRemainingTime($event)"
                 :break_id="current_break_id"
             >                
             </employee-break-timer>
@@ -320,21 +337,20 @@
                 <div class="col-md-12"
                   v-for="breakList in break_list" :key="breakList.id"
                   style="display:block"
-                  @click="changeBreakStatus(breakList)"      
-                  v-if="breakList.status != null"   
-                  :disabled="is_check_in == false || breakList.is_disabled == true"   
-                  :key='breakList.id'     
-                  
                 >
                   <button 
                       style="margin-bottom: 20px; margin-left: 40px;"
-                      :class="{' btn btn-md btn-neutral is-blue': breakList.status, 'btn btn-md btn-neutral is-red': !breakList.status }"
+                      @click="changeBreakStatus(breakList)"      
+                      v-if="breakList.status != null"
+                      :key='breakList.id'
+                      :class="checkBreakStatus(breakList.status)"
+                      :disabled="is_check_in == false || breakList.is_disabled == true"
                     >
                     {{ breakList.name }}
                     {{ breakList.break_time }} mins
                   </button>
                 </div>
-            </div>
+            </div>            
          
               <!-- <div class="col-xl-3 col-md-6" v-for="break in breakList" :key="break.id">
                 <div class="card card-stats">
@@ -382,16 +398,161 @@
   <script src="assets/js/argon.js?v=1.2.0"></script>
   <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+ 
+  <script src="assets/js/moment.js"></script>
+  <script src="assets/js/require.js"></script>
   <script>
+    Vue.component('employee-timer-elapsed-time', {
+      template: '<h1>{{time}}</h1>',
+      data() {
+          return {
+              interval:null,
+              days:0,
+              hours:0,
+              minutes:0,
+              seconds:0,
+              time: "",
+              intervals:{
+                  second: 1000,
+                  minute: 1000 * 60,
+                  hour: 1000 * 60 * 60,
+                  day: 1000 * 60 * 60 * 24
+              },
+              increment_count: 0,
+          }
+      },
+      props:{
+          from : {
+              required:true
+          },
+          status : {
+              required:true
+          },
+          break_duration : {
+              required:true
+          },
+      },
+      mounted() {
+          if (this.status) {
+              this.timer = setInterval(() => {
+                  this.updateDiffs();
+              },1000);
+          }
+          
+          this.updateDiffs();
+      },
+      destroyed() {
+          clearInterval(this.interval);
+      },
+      watch: {
+          status(value) {
+              if (!value) {
+                  clearInterval(this.timer);
+              }
+              else {
+                  this.timer = setInterval(() => {
+                      this.updateDiffs();
+                  },1000);
+              }
+          }
+      },
+      methods:{
+          updateDiffs() {
+              var now = Date.now();
+              var diff = Math.abs(now - this.from.getTime());
+              diff -= this.break_duration;
+              this.hours = Math.floor(diff / this.intervals.hour);
+              diff -= this.hours * this.intervals.hour;
+              this.minutes = Math.floor(diff / this.intervals.minute);
+              diff -= this.minutes * this.intervals.minute;
+              this.seconds = Math.floor(diff / this.intervals.second);
 
-    // import Vue from 'vue'
-    // import EmployeeBreakTimer from './EmployeeBreakTimer'
+              var hDisplay = this.hours < 10 ? "0"+this.hours : this.hours;
+              var mDisplay = this.minutes < 10 ? "0"+this.minutes : this.minutes;
+              var sDisplay = this.seconds < 10 ? "0"+this.seconds : this.seconds;
 
-    Vue.component('employee-break-timer', './EmployeeBreakTimer')
+              this.time = hDisplay + ":" + mDisplay + ":" + sDisplay;
+          }
+      }
+    })
+
+    Vue.component('employee-break-timer', {
+      // template: '<h1>Break {{formattedTimeLeft}}</h1>',
+      template: '<h1></h1>',
+      data() {
+          return {
+              timePassed: 0,
+              timerInterval: null,
+              remainingTime: 0
+          }
+      },
+      props:{
+          status : {
+              required:true
+          },
+          time_limit : {
+              required:true
+          },
+          break_id: {
+              required:true
+          }
+      },
+      computed: {
+          formattedTimeLeft() {
+              const timeLeft = this.timeLeft;
+              const minutes = Math.floor(timeLeft / 60);
+              let seconds = timeLeft % 60;
+
+              if (seconds < 10) {
+                  seconds = `0${seconds}`;
+              }
+
+              return `${minutes}:${seconds} mins`;
+          },
+          timeLeft() {
+              var v = this.time_limit - this.timePassed;
+              this.remainingTime = v;
+              this.$emit("change", {id: this.break_id, remainingTime: v});
+              return v;
+          },
+      },
+      watch: {
+          status(value) {
+              if(value){
+                  this.startTimer();
+              }        
+              else{
+                  this.onTimesUp();
+              }    
+          },
+          timeLeft(newValue) {
+              if (newValue === 0) {
+                  this.onTimesUp();
+              }
+          }
+      },
+
+      mounted() {
+          if (this.status) {
+              this.startTimer();
+          }        
+      },
+
+      methods: {
+          onTimesUp() {
+          // clearInterval(this.timerInterval);
+          },
+
+          startTimer() {
+          this.timerInterval = setInterval(() => (this.timePassed += 1), 1000);
+          }
+      }
+    })
 
     new Vue({
       el: '#app',
       data: {
+        csrf_token: '',
         timerVar: null,
         totalSeconds: 0,
         totalSecondsBreak: 0,
@@ -417,7 +578,8 @@
         disable_checkStatus: false,
         break_time_limit: 0,
         current_break_id: 0,
-        local_stored_break: {}
+        local_stored_break: {},
+        tmp_employee_id: 1
       },
 
       watch: {
@@ -452,7 +614,6 @@
         },
         is_break(value){
           var vm = this;
-
           if(value == true){
               vm.break_list.map((item, index) => {
                 if(item.id === vm.current_break_id){                     
@@ -468,7 +629,8 @@
                         }                
                         
                     }
-                    vm.$set(item,'status',1);                
+                    vm.$set(item,'status',1);    
+                    vm.$set(item,'is_disabled',false);            
                 }
                 else{
                   vm.$set(item,'is_disabled',true);
@@ -485,8 +647,42 @@
         // this.getBreak()        
         this.getBreaks()
       },
+      mounted(){
+        var vm = this;
 
+        vm.getCsrfToken();
+
+        // this.getBreak()
+        // this.totalSeconds = parseInt(localStorage.getItem('runningTime') ?? 0);
+        // this.logStatus = localStorage.getItem('logStatus')
+        // $('#btnLogCheckOut').hide();
+        // if(this.totalSeconds > 0) {
+        //   this.timerVar = setInterval(this.countTimer, 1000);
+        //   window.$('#btnLogCheckOut').show();
+        //   window.$('#btnLogCheckIn').hide();
+        // }   
+
+      },
       methods: {
+
+        async getCsrfToken(){
+          var vm = this;
+            try {
+              const response = await axios.get('http://localhost:8081/csrfToken');
+              $('#_token').val(response.data)
+              $("meta[name='csrf-token']").attr('content', response.data._token);
+
+              axios.defaults.headers.common = {
+                  'X-Requested-With': 'XMLHttpRequest',
+                  'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+              };
+              // vm.csrf_token = response.data
+              console.log(response);
+            }catch (error) {
+              console.log('method: getCsrfToken');
+              console.error(error);
+            }
+        },
 
         async getBreaks() {
             var vm = this;
@@ -511,14 +707,16 @@
             try{
 
               axios.get('http://localhost:8081/employee/specific-attendance', {
-                  employee_id : id, 
-                  at_date: date 
+                  params: {
+                    employee_id : id, 
+                    at_date: date 
+                  }
               })
               .then((response) => {                
-                  vm.employee_attendance = response.employee_attendance;
-                  if(response.employee_attendance) {
-                    if(response.employee_attendance.time_out == null){
-                      var date = response.employee_attendance.at_date + " " + response.employee_attendance.time_in;
+                  vm.employee_attendance = response.data.employee_attendance;
+                  if(vm.employee_attendance) {
+                    if(vm.employee_attendance.time_out == null){
+                      var date = vm.employee_attendance.at_date + " " + vm.employee_attendance.time_in;
                       vm.time_in_date = new Date(date);
                       vm.timer_status = true;
                       vm.is_check_in = true;
@@ -613,13 +811,13 @@
 
         checkBreakStatus(value) {
           if (value == 1) {
-            return 'red';
+            return 'btn btn-danger';
           }
           if (value == 0) {
-            return 'green';
+            return 'btn btn-success';
           }
           if (value == 2) {
-            return 'primary';
+            return 'btn btn-secondary';
           }
         },
         changeBreakStatus(data) {
@@ -635,48 +833,88 @@
           var today = new Date();
           var date = today.getFullYear()+'-'+(today.getMonth()+1)+'-'+today.getDate();
           var time = today.getHours()+':'+today.getMinutes()+':'+today.getSeconds();
-          var start_time = date + " " + time;  
+          var start_time = date + " " + time;
 
-          vm.is_break = true;
-          vm.timer_status = false;
-          vm.break_time_limit = data.remaining_seconds;
-          vm.current_break_id = data.id;
-          vm.disable_checkStatus = true;
+          axios.post('http://localhost:8081/employee/break-in', {
+              attendance_id : vm.employee_attendance.id,
+              start_time: start_time,
+              break_id: data.id
+          })
+          .then((response) => {
+            vm.is_break = true;
+            vm.timer_status = false;
+            vm.break_time_limit = data.remaining_seconds;
+            vm.current_break_id = data.id;
+            vm.disable_checkStatus = true;
+
+            vm.break_list.map((item, index) => {
+                if(item.id === data.id){
+                  vm.$set(item,'status',1);
+                }
+                else{
+                  vm.$set(item,'is_disabled',true);
+                }
+            });
+          }, (error) => {
+            console.log(error);
+          });
+        },
+        breakOut(data) {
+          var vm = this;        
+
+          var today = new Date();
+          var date = today.getFullYear()+'-'+(today.getMonth()+1)+'-'+today.getDate();
+          var time = today.getHours()+':'+today.getMinutes()+':'+today.getSeconds();
+          var end_time = date + " " + time;
+
+          // var start_time = new Date(data.start_time);
+          // var diff = Math.abs(today.getTime() - start_time.getTime());
+          // var time_consume = Math.floor(diff / 1000);
+
+          var time_consume = 0;
 
           vm.break_list.map((item, index) => {
               if(item.id === data.id){
-                vm.$set(item,'status',1);
-              }
-              else{
-                vm.$set(item,'is_disabled',true);
-              }
+                  time_consume = item.remaining_seconds;
+              }            
           });
 
-          console.log(vm.is_break);
+          axios.post('http://localhost:8081/employee/break-out', {
+              attendance_id : vm.employee_attendance.id,
+              end_time: end_time,
+              break_id: data.id,
+              time_consume: time_consume
+          })
+          .then((response) => {            
+              vm.removeLocalStorageBreakRemainingSec(); 
+              vm.is_break = false;
+              vm.timer_status = true;
+              vm.disable_checkStatus = false;
 
-          // axios.post('http://localhost:8081/employee/break-in', {
-          //     attendance_id : 1,
-          //     start_time: start_time,
-          //     break_id: data.id
-          // })
-          // .then((response) => {
-          //   vm.is_break = true;
-          //   vm.timer_status = false;
-          //   vm.break_time_limit = data.remaining_seconds;
-          //   vm.current_break_id = data.id;
-          //   vm.disable_checkStatus = true;
+              vm.break_list.map((item, index) => {
+                  if(item.id === data.id){
 
-          //   vm.break_list.map((item, index) => {
-          //       if(item.id === data.id){
-          //         vm.$set(item,'status',1);
-          //       }
-          //       else{
-          //         vm.$set(item,'is_disabled',true);
-          //       }
-          //   });
-          // }, (error) => {
-          //   console.log(error);
-          // });
+                    var tmp = 0;
+                    if(item.remaining_seconds <= 0){
+                        vm.$set(item,'is_disabled',true);
+                        tmp = vm.formattedTimeLeft(parseInt(tmp_remaining_sec));
+                        vm.$set(item,'break_time',tmp);
+                        vm.$set(item,'remaining_seconds',parseInt(tmp_remaining_sec)); 
+                        vm.$set(item,'status',0);
+                    }      
+                    else{
+                      vm.$set(item,'status',0);
+                      vm.$set(item,'is_disabled',false);
+                    }                     
+                  }
+                  else{
+                    vm.$set(item,'is_disabled',false);
+                    vm.$set(item,'status',0);
+                  }
+              });
+          }, (error) => {
+            console.log(error);
+          });
         },
         removeLocalStorageBreakRemainingSec(){
             localStorage.removeItem('is_break');
@@ -729,6 +967,80 @@
                 }
             });
 
+        },
+        dateText(date) {
+          if(date){
+            var d = this.time_in_date;
+            d = moment().format("lll");
+            return d;
+          }
+        },
+
+        changeTimeInStatus(value) {
+          if (value) {
+            this.timeOut();
+          }
+          else {          
+            this.timeIn();
+          }
+        },
+
+        timeIn() {
+          var vm = this;
+          var id = vm.tmp_employee_id; //this.$route.params.employee_id;
+          var today = new Date();
+          var date = today.getFullYear()+'-'+(today.getMonth()+1)+'-'+today.getDate();
+          var time = today.getHours()+':'+today.getMinutes()+':'+today.getSeconds();  
+
+          axios.post('http://localhost:8081/employee/time-in', {
+              employee_id : id,
+              date: date,
+              time: time
+          })
+          .then((response) => {
+
+            vm.employee_attendance = response.data.employee_attendance;              
+              if(vm.employee_attendance) {
+                var date = vm.employee_attendance.at_date + " " + vm.employee_attendance.time_in;
+                vm.time_in_date = new Date(date);
+                vm.timer_status = true;
+                vm.is_check_in = true;
+              }
+
+          }).catch(function(error){
+            console.log(error);
+          });
+        },
+        timeOut() {
+          var vm = this;
+          var id = vm.tmp_employee_id; //this.$route.params.employee_id;
+          var today = new Date();
+          var date = today.getFullYear()+'-'+(today.getMonth()+1)+'-'+today.getDate();
+          var time = today.getHours()+':'+today.getMinutes()+':'+today.getSeconds();      
+          
+          axios.post('http://localhost:8081/employee/time-out', {
+              employee_id : id,
+              date: date,
+              time: time
+          })
+          .then((response) => {
+
+              vm.removeLocalStorageBreakRemainingSec(); 
+              vm.employee_attendance = response.data.employee_attendance;            
+              if(vm.employee_attendance) {
+                var date = vm.employee_attendance.at_date + " " + vm.employee_attendance.time_in;
+                vm.time_in_date = new Date(date);
+                vm.timer_status = false;
+                vm.is_check_out = true;
+              }
+
+              vm.break_list.map((item, index) => {
+                  vm.$set(item,'is_disabled',true);
+              });
+
+          }).catch(function(error){
+            console.log(error);
+          });
         },
 
 
@@ -783,78 +1095,53 @@
             console.error(error);
           }
         },
-        countTimer() {
-           ++this.totalSeconds;
-           var hour = Math.floor(this.totalSeconds /3600);
-           var minute = Math.floor((this.totalSeconds - hour*3600)/60);
-           var seconds = this.totalSeconds - (hour*3600 + minute*60);
-           if(hour < 10)
-             hour = "0"+hour;
-           if(minute < 10)
-             minute = "0"+minute;
-           if(seconds < 10)
-             seconds = "0"+seconds;
-             localStorage.setItem("runningTime", this.totalSeconds);
-             document.getElementById("timer").innerHTML = hour + ":" + minute + ":" + seconds;
-        },
-        countTimerBreaks() {
-           --this.totalSecondsBreak;
-           var hour = Math.floor(this.totalSecondsBreak /3600);
-           var minute = Math.floor((this.totalSecondsBreak - hour*3600)/60);
-           var seconds = this.totalSecondsBreak - (hour*3600 + minute*60);
-           if(hour < 10)
-             hour = "0"+hour;
-           if(minute < 10)
-             minute = "0"+minute;
-           if(seconds < 10)
-             seconds = "0"+seconds;
-             localStorage.setItem("runningTimeBreak", this.totalSecondsBreak);
-             document.getElementById("timer").innerHTML = hour + ":" + minute + ":" + seconds;
-        },
-        radioBreak() {
-          clearInterval(this.timerVar)
-        },
-        btnLogCheckIn() {
-          this.timerVar = setInterval(this.countTimer, 1000);
-          this.totalSeconds = parseInt(localStorage.getItem('runningTime') ?? 0);
-          this.logStatus = 'Check-out'
-          localStorage.setItem("logStatus", 'Check-out');
-          window.$('#btnLogCheckOut').show();
-          window.$('#btnLogCheckIn').hide();
-        },
-        btnLogCheckOut() {
-          this.logStatus = 'Check-in'
-          localStorage.setItem("logStatus", 'Check-in');
-          window.$('#btnLogCheckOut').hide();
-          window.$('#btnLogCheckIn').show();
-          clearInterval(this.timerVar)
-        },
+        // countTimer() {
+        //    ++this.totalSeconds;
+        //    var hour = Math.floor(this.totalSeconds /3600);
+        //    var minute = Math.floor((this.totalSeconds - hour*3600)/60);
+        //    var seconds = this.totalSeconds - (hour*3600 + minute*60);
+        //    if(hour < 10)
+        //      hour = "0"+hour;
+        //    if(minute < 10)
+        //      minute = "0"+minute;
+        //    if(seconds < 10)
+        //      seconds = "0"+seconds;
+        //      localStorage.setItem("runningTime", this.totalSeconds);
+        //      document.getElementById("timer").innerHTML = hour + ":" + minute + ":" + seconds;
+        // },
+        // countTimerBreaks() {
+        //    --this.totalSecondsBreak;
+        //    var hour = Math.floor(this.totalSecondsBreak /3600);
+        //    var minute = Math.floor((this.totalSecondsBreak - hour*3600)/60);
+        //    var seconds = this.totalSecondsBreak - (hour*3600 + minute*60);
+        //    if(hour < 10)
+        //      hour = "0"+hour;
+        //    if(minute < 10)
+        //      minute = "0"+minute;
+        //    if(seconds < 10)
+        //      seconds = "0"+seconds;
+        //      localStorage.setItem("runningTimeBreak", this.totalSecondsBreak);
+        //      document.getElementById("timer").innerHTML = hour + ":" + minute + ":" + seconds;
+        // },
+        // radioBreak() {
+        //   clearInterval(this.timerVar)
+        // },
+        // btnLogCheckIn() {
+        //   this.timerVar = setInterval(this.countTimer, 1000);
+        //   this.totalSeconds = parseInt(localStorage.getItem('runningTime') ?? 0);
+        //   this.logStatus = 'Check-out'
+        //   localStorage.setItem("logStatus", 'Check-out');
+        //   window.$('#btnLogCheckOut').show();
+        //   window.$('#btnLogCheckIn').hide();
+        // },
+        // btnLogCheckOut() {
+        //   this.logStatus = 'Check-in'
+        //   localStorage.setItem("logStatus", 'Check-in');
+        //   window.$('#btnLogCheckOut').hide();
+        //   window.$('#btnLogCheckIn').show();
+        //   clearInterval(this.timerVar)
+        // },
       },
-      mounted(){
-        // this.getBreak()
-        this.totalSeconds = parseInt(localStorage.getItem('runningTime') ?? 0);
-        this.logStatus = localStorage.getItem('logStatus')
-        $('#btnLogCheckOut').hide();
-        if(this.totalSeconds > 0) {
-          this.timerVar = setInterval(this.countTimer, 1000);
-          window.$('#btnLogCheckOut').show();
-          window.$('#btnLogCheckIn').hide();
-        }      
-        
-        $('.breakBtn').click(function(){
-            alert('yeah');
-        }); 
-
-      },
-      // updated() {
-      //     var vm = this;
-          
-      //     $('.breakBtn').click(function(e){
-      //         e.stopImmediatePropagation();
-      //         console.log('ayyay');
-      //         console.log($('.breakBtn').data('breakinfo'))
-      //     });
-      // }
     })
     
      
