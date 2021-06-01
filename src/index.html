@@ -271,7 +271,7 @@
                   <span>Support</span>
                 </a>
                 <div class="dropdown-divider"></div>
-                <a href="login.html" class="dropdown-item">
+                <a href="javascript:void(0)" class="dropdown-item" @click="logout()">
                   <i class="ni ni-user-run"></i>
                   <span>Logout</span>
                 </a>
@@ -697,7 +697,10 @@
       },
       mounted(){
         var vm = this;
-
+        if (sessionStorage.getItem("loginVal") === null) {
+          window.location.href = "login.html";
+        }
+        
         vm.getCsrfToken();
 
         // this.getBreak()
@@ -1102,6 +1105,18 @@
           }).catch(function(error){
             console.log(error);
           });
+        },
+        logout(){            
+          var vm = this;
+            axios.post('http://localhost:8081/user/logout', {})
+            .then((response) => {
+              const logoutVal = response.data;
+              sessionStorage.removeItem("loginVal");
+              sessionStorage.clear();
+              window.location.href = "login.html";
+            }, (error) => {
+              console.log(error);
+            });
         },
 
 
