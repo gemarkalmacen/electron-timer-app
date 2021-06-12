@@ -59,7 +59,9 @@
     }
   },
   "dependencies": {
+    "axios": "^0.21.1",
     "electron-squirrel-startup": "^1.0.0",
+    "image-to-base64": "^2.2.0",
     "os-utils": "0.0.14",
     "screenshot-desktop": "^1.12.3"
   },
