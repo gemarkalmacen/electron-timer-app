@@ -3,6 +3,8 @@ const path = require('path');
 const screenshot = require('screenshot-desktop');
 const os = require('os');
 const desktopDir = path.join(os.homedir(), "Desktop");
+const imageToBase64 = require('image-to-base64');
+const axios = require('axios').default;
 
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -19,6 +21,10 @@ const createWindow = () => {
     // height: 800,
     maximizable: false,
     resizable: false,
+    // webPreferences: {
+    //     nodeIntegration: true,
+    //     contextIsolation: false,
+    // }
   });
 
   // and load the index.html of the app.
@@ -45,12 +51,36 @@ app.on('window-all-closed', () => {
 });
 
 
-
-
-
 setInterval(() => {
   var randomStr = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-  screenshot({ filename: `${desktopDir}/splaceimage/${randomStr}.png` })
+  var imgFilename = `${desktopDir}/splaceimage/${randomStr}.png`
+  
+  screenshot({ filename: imgFilename }).then((img)=>{
+
+    imageToBase64(imgFilename) // Path to the image
+      .then(
+          (response) => {
+              //  Insert into db
+              axios.post('http://localhost:8081/screenshot/store', {
+                  page: '',
+                  image_base64: response,
+                  user_id: 0
+              }).then(function (res) {
+                  // console.log(res.data);
+              }).catch(function (err) {
+                  console.log(err);
+              });
+          }
+      )
+      .catch(
+          (error) => {
+            console.log("base64 error");
+              console.log(error); // Logs an error if there was one
+          }
+      )
+
+  })
+    
   // screenshot({ filename: randomStr+".png" }).then((imgPath) => {
   //   // imgPath: absolute path to screenshot
   //   // created in current working directory named shot.png
